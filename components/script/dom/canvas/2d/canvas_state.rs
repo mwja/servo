@@ -1544,7 +1544,12 @@ impl CanvasState {
         }
 
         if self.state.borrow().font_style.is_none() {
-            self.set_font(cx, canvas, CanvasContextState::DEFAULT_FONT_STYLE.into())
+            self.set_font(
+                cx,
+                global_scope,
+                canvas,
+                CanvasContextState::DEFAULT_FONT_STYLE.into(),
+            )
         }
         // This may be `None` if if this is offscreen canvas, in which case just use
         // the initial values for the text style.
@@ -1590,7 +1595,12 @@ impl CanvasState {
         }
 
         if self.state.borrow().font_style.is_none() {
-            self.set_font(cx, canvas, CanvasContextState::DEFAULT_FONT_STYLE.into())
+            self.set_font(
+                cx,
+                global_scope,
+                canvas,
+                CanvasContextState::DEFAULT_FONT_STYLE.into(),
+            )
         }
         // This may be `None` if if this is offscreen canvas, in which case just use
         // the initial values for the text style.
@@ -1635,7 +1645,12 @@ impl CanvasState {
         // > Step 3: Let font be the current font of target, as given by that object's font
         // > attribute.
         if self.state.borrow().font_style.is_none() {
-            self.set_font(cx, canvas, CanvasContextState::DEFAULT_FONT_STYLE.into());
+            self.set_font(
+                cx,
+                global,
+                canvas,
+                CanvasContextState::DEFAULT_FONT_STYLE.into(),
+            );
         }
 
         let font_context = &global.font_context();
@@ -1712,22 +1727,26 @@ impl CanvasState {
     pub(super) fn set_font(
         &self,
         cx: &mut JSContext,
+        _global_scope: &GlobalScope,
         canvas: Option<&HTMLCanvasElement>,
         value: DOMString,
     ) {
-        let canvas = match canvas {
-            Some(element) => element,
+        let resolved_font_style = match canvas {
+            Some(canvas) => {
+                let node = canvas.upcast::<Node>();
+                let window = canvas.owner_window();
+
+                let Some(resolved_font) =
+                    window.resolved_font_style_query(cx, node, String::from(value))
+                else {
+                    return;
+                };
+
+                resolved_font
+            },
             None => return, // offscreen canvas doesn't have a placeholder canvas
         };
-        let node = canvas.upcast::<Node>();
-        let window = canvas.owner_window();
 
-        let Some(resolved_font_style) =
-            window.resolved_font_style_query(cx, node, String::from(value))
-        else {
-            // This will happen when there is a syntax error.
-            return;
-        };
         self.state.borrow_mut().font_style = Some(resolved_font_style);
     }
 
